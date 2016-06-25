@@ -1,10 +1,10 @@
 //tests
 
-var cli = require('./lib/node-cli.js');
+var cli = require('../index.js');
 
 
 cli()
-.delimiter('$_$')
+.delimiter('$_H4x0R_$ ')
 .command('h',function(args,done){
     var p = this;
     setTimeout(function(){ 
@@ -43,4 +43,5 @@ cli()
       done();
     },1000)
   });
-});
+})
+.run('setup');
