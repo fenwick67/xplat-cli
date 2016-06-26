@@ -1,15 +1,14 @@
 {
   "name": "xplat-cli",
   "version": "0.0.1",
-  "description": "Cross-platform command line input module.  For Node and the browser.",
+  "description": "Write simple CLI programs once for the browser and the web.",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "",
-  "license": "ISC",
+  "author": "Drew Harwell",
+  "license": "MIT",
   "dependencies": {
-    "minimist": "^1.2.0",
-    "vorpal": "^1.11.2"
+    "minimist": "^1.2.0"
   }
 }
