@@ -1,4 +1,359 @@
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+/*
+
+common entry point
+
+*/
+
+// detect node hackily
+var isNode = true;
+if (typeof window == 'object') {
+  isNode = false;
+}
+
+if (isNode){
+    module.exports = exports = require('./lib/node-cli');
+}else{
+    module.exports = exports = require('./lib/browser-cli');
+}
+},{"./lib/browser-cli":3,"./lib/node-cli":4}],2:[function(require,module,exports){
+/*
+  todo:
+  use node's EventListener instead of stupid onX functions
+*/
+
+var parseArgs = require('minimist');
+var EventEmitter = require('events').EventEmitter;
+var util = require('util');
+
+module.exports = function(inStream,outStream){
+    
+   /*
+   notes for implementer:
+   
+   you need to call cli.onEnter('str') when a user hits "enter" in your app.
+   you need to implement handling the delimiter too
+   
+   */
+    
+   var self = this;
+   
+   this.locked = false;
+   
+   this.setlocked = function(l){
+       self.locked = false;
+   }
+   
+   this.rootCtx = true;//are we in the root context?
+   
+   this.onEnter = function(s){
+     if (self.rootCtx){
+       self.rootCtx = false;
+       self.runCommand(s,function(er){
+         //always exit app context
+         self.rootCtx = true;
+       });
+     }else{//send to program
+       if (!self.currentProgram){
+           console.log('woops');
+           return;//something went very wrong
+       }else{
+         //console.log('wop');
+         self.currentProgram.sendEnter(s);
+       }
+     }       
+   }
+   
+   //external API for running commands
+   this.run = function(cmd,cb){
+     self.rootCtx = false;
+     self.runCommand(cmd,function(er){
+       //always exit app context
+       self.rootCtx = true;
+     });
+   }
+   
+   self.programs = {};
+   this.currentProgram = null;
+   this.delimiterProp = '$';
+   this.delimiter = function(d){
+       self.delimiterProp = d.toString();
+       return self;
+   }
+   
+   this.command = function(name,fn){//register a command
+     var p = new Program(fn);
+     oneOrMany(name,function(n){
+       self.programs[n] = p;
+     });     
+     return self;
+   }
+   
+   // alias "name(s)" to call "other"
+   this.alias = function(name,other){
+     oneOrMany(name,function(n){
+       self.programs[n] = self.programs[other]; 
+     });
+     return self;
+   }
+   
+    this.runCommand = function(str,done){
+      self.rootCtx = false;//in case this was called directly
+      if (typeof str != 'string'){
+        // todo run a _empty command
+        invalidCommand(str);
+        done(null);
+        return self;
+      }
+      //command "str" was input into the cli
+      var args = parseArgs(str.toString().split(' ')); 
+      if(args._.length < 1){
+        done(null);
+        return self;
+      }
+       
+      if ( Object.keys(self.programs).length > 0 && typeof args._[0] == 'string' ){
+        var pname = args._[0];
+                
+        if(!self.programs[pname]){
+          invalidCommand(pname);
+          return done(null);
+        }
+        
+        args._.shift();//remove first arg
+        self.currentProgram = self.programs[pname];
+        var p = self.currentProgram;
+        p.closed = false;
+        p._run(args,function(er){
+          p.closed = true;
+          done(er)
+        });
+      }else{
+        invalidCommand('<enter>');
+        return done(null);
+      }
+       
+    }
+    
+    function invalidCommand(str){
+      outStream.write('invalid command: "'+str+'"\n');
+    }
+    
+ 
+    
+    // create a program from a function.  
+    function Program(f){
+        EventEmitter.call(this);
+        var program = this;
+        program._run = f;
+                
+        program.closed = false;
+        
+        program.write = function(){
+            if (program.closed){
+                return program;
+            }
+            var len = arguments.length;
+            for (var i = 0; i < len; i ++){
+                outStream.write(arguments[i]);
+            }
+            return program;
+        }
+        
+        program.writeln = function(){
+          var len = arguments.length;
+          for (var i = 0; i < len; i ++){
+              program.write(arguments[i]);
+          }
+          program.write('\n');     
+          return program;
+        }
+        
+        program.sendEnter = function(s){
+           program.emit('enter',s);
+        }
+        
+        program.prompt = function(s,f){
+          program.write(s);
+          program.once('enter',function(str){
+            f(str);
+          });
+        }
+    }  
+    util.inherits(Program,EventEmitter);
+    
+      
+    return this;
+}
+
+
+// function stub
+function fs(){}
+
+// do something for just one variable, or if it's an array, do it for each one
+function oneOrMany(thing,fn){
+  if (typeof thing != 'string' && typeof thing.length == 'number'){
+    for (var i = 0; i < thing.length; i ++){
+      fn(thing[i]);
+    }
+  }else{
+    fn(thing);
+  }
+}
+},{"events":5,"minimist":10,"util":9}],3:[function(require,module,exports){
+// browser command line interface using same library
+
+// this example uses some html selectors but honestly it would be arbitrary to use console.log for output, etc
+
+module.exports = function(opts){
+  opts=opts||{};
+  /*
+  opts is:
+  {
+    lineSelector:'',
+    cursorSelector:'',
+    termSelector:''
+  }  
+  */
+
+  var line = document.querySelector(opts.lineSelector||'#term-line');
+  var cursor = document.querySelector(opts.cursorSelector||'#term-cursor');
+  var term = document.querySelector(opts.termSelector||'#term');
+  var parent = term.parentElement;
+  
+  var outStream = {
+    write:function(s){
+      term.innerHTML = term.innerHTML + escapeHtml(s);//todo: handle color codes.  Later.      
+      //scroll terminal
+      parent.scrollTop = parent.scrollHeight;
+    }
+  }
+
+  var inStream = {
+    //lala
+  }
+
+  var cli = require('./all-cli-simple')(inStream,outStream); 
+  
+  line.addEventListener('keydown',function(e){
+    if (e.key == 'Enter'){
+      //don't print it... I guess???
+      e.preventDefault();
+      
+      //get line
+      var str = line.value;
+      //write to terminal
+      if(cli.rootCtx){
+        outStream.write(cli.delimiterProp+str+'\n');
+      }else{        
+        outStream.write(str+'\n');
+      }
+      
+      cli.onEnter(str);
+      //erase line
+      line.value = '';
+    }
+  });
+  
+  parent.addEventListener('click',snap);
+  
+  function snap(){
+    //snap to the line
+    line.focus();
+  }
+  
+  cli.delimiter = function(dstr){
+    var esc = escapeHtml(dstr.toString());
+    cursor.innerHTML = esc;
+    cli.delimiterProp = esc;
+    return cli;
+  }
+  
+  cli.delimiter(cli.delimiterProp);//use default for now until overridden
+  
+  return cli;
+}
+
+/*
+  code below this was taken from moustache.js, which is really neat and MIT licensed.  Copyright info follows:
+  
+  The MIT License
+
+  Copyright (c) 2009 Chris Wanstrath (Ruby)
+  Copyright (c) 2010-2014 Jan Lehnardt (JavaScript)
+  Copyright (c) 2010-2015 The mustache.js community
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+*/
+
+var entityMap = {
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;",
+  '"': '&quot;',
+  "'": '&#39;',
+  "/": '&#x2F;'
+};
+
+function escapeHtml(string) {
+  return String(string).replace(/[&<>"'\/]/g, function (s) {
+    return entityMap[s];
+  });
+}
+
+},{"./all-cli-simple":2}],4:[function(require,module,exports){
+(function (process){
+// cli-node
+
+/*
+  Todo: implement cursor
+
+
+*/
+
+module.exports = function(opts){
+  opts = opts || {};//unused right now
+
+  var outStream = {
+    write:function(s){
+      process.stdout.write(s);
+    }
+  }
+
+  var inStream = {
+    
+  }
+
+  var cli = require('./all-cli-simple')(inStream,outStream);
+
+  var s = '';
+  process.stdin.setEncoding('utf8');
+  process.stdin.on('readable',function(){
+    var chunk = process.stdin.read();
+    if(!chunk){
+      return;
+    }
+    s = s + ( chunk.toString().replace(/\r/g,'') );
+    var brIndex = s.indexOf('\n');
+    if ( brIndex > -1) {
+      var before = s.substr(0,brIndex);
+      cli.onEnter(before);
+      s = s.substring(brIndex+1);
+    }
+  });
+  process.stdin.resume;
+  
+  return cli;
+
+}
+
+}).call(this,require('_process'))
+},{"./all-cli-simple":2,"_process":7}],5:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -58,8 +413,12 @@ EventEmitter.prototype.emit = function(type) {
       er = arguments[1];
       if (er instanceof Error) {
         throw er; // Unhandled 'error' event
+      } else {
+        // At least give some kind of context to the user
+        var err = new Error('Uncaught, unspecified "error" event. (' + er + ')');
+        err.context = er;
+        throw err;
       }
-      throw TypeError('Uncaught, unspecified "error" event.');
     }
   }
 
@@ -298,7 +657,7 @@ function isUndefined(arg) {
   return arg === void 0;
 }
 
-},{}],2:[function(require,module,exports){
+},{}],6:[function(require,module,exports){
 if (typeof Object.create === 'function') {
   // implementation from standard node.js 'util' module
   module.exports = function inherits(ctor, superCtor) {
@@ -323,16 +682,44 @@ if (typeof Object.create === 'function') {
   }
 }
 
-},{}],3:[function(require,module,exports){
+},{}],7:[function(require,module,exports){
 // shim for using process in browser
 
 var process = module.exports = {};
+
+// cached from whatever global is present so that test runners that stub it
+// don't break things.  But we need to wrap it in a try catch in case it is
+// wrapped in strict mode code which doesn't define any globals.  It's inside a
+// function because try/catches deoptimize in certain engines.
+
+var cachedSetTimeout;
+var cachedClearTimeout;
+
+(function () {
+  try {
+    cachedSetTimeout = setTimeout;
+  } catch (e) {
+    cachedSetTimeout = function () {
+      throw new Error('setTimeout is not defined');
+    }
+  }
+  try {
+    cachedClearTimeout = clearTimeout;
+  } catch (e) {
+    cachedClearTimeout = function () {
+      throw new Error('clearTimeout is not defined');
+    }
+  }
+} ())
 var queue = [];
 var draining = false;
 var currentQueue;
 var queueIndex = -1;
 
 function cleanUpNextTick() {
+    if (!draining || !currentQueue) {
+        return;
+    }
     draining = false;
     if (currentQueue.length) {
         queue = currentQueue.concat(queue);
@@ -348,7 +735,7 @@ function drainQueue() {
     if (draining) {
         return;
     }
-    var timeout = setTimeout(cleanUpNextTick);
+    var timeout = cachedSetTimeout(cleanUpNextTick);
     draining = true;
 
     var len = queue.length;
@@ -365,7 +752,7 @@ function drainQueue() {
     }
     currentQueue = null;
     draining = false;
-    clearTimeout(timeout);
+    cachedClearTimeout(timeout);
 }
 
 process.nextTick = function (fun) {
@@ -377,7 +764,7 @@ process.nextTick = function (fun) {
     }
     queue.push(new Item(fun, args));
     if (queue.length === 1 && !draining) {
-        setTimeout(drainQueue, 0);
+        cachedSetTimeout(drainQueue, 0);
     }
 };
 
@@ -416,14 +803,14 @@ process.chdir = function (dir) {
 };
 process.umask = function() { return 0; };
 
-},{}],4:[function(require,module,exports){
+},{}],8:[function(require,module,exports){
 module.exports = function isBuffer(arg) {
   return arg && typeof arg === 'object'
     && typeof arg.copy === 'function'
     && typeof arg.fill === 'function'
     && typeof arg.readUInt8 === 'function';
 }
-},{}],5:[function(require,module,exports){
+},{}],9:[function(require,module,exports){
 (function (process,global){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -1013,318 +1400,7 @@ function hasOwnProperty(obj, prop) {
 }
 
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./support/isBuffer":4,"_process":3,"inherits":2}],6:[function(require,module,exports){
-(function (process){
-/*
-
-common entry point
-
-*/
-
-//detect node
-var isNode = false;    
-if (typeof process === 'object') {
-  if (typeof process.versions === 'object') {
-    if (typeof process.versions.node !== 'undefined') {
-      isNode = true;
-    }
-  }
-}
-
-if (isNode){
-    module.exports = exports = require('./lib/node-cli');
-}else{
-    module.exports = exports = require('./lib/browser-cli');
-}
-}).call(this,require('_process'))
-},{"./lib/browser-cli":8,"./lib/node-cli":9,"_process":3}],7:[function(require,module,exports){
-/*
-  todo:
-  use node's EventListener instead of stupid onX functions
-*/
-
-var parseArgs = require('minimist');
-var EventEmitter = require('events').EventEmitter;
-var util = require('util');
-
-module.exports = function(inStream,outStream){
-    
-   /*
-   notes for implementer:
-   
-   you need to call cli.onEnter('str') when a user hits "enter" in your app.
-   you need to implement handling the delimiter too
-   
-   */ 
-    
-   var self = this;
-   
-   this.locked = false;
-   
-   this.setlocked = function(l){
-       self.locked = false;
-   }
-   
-   this.rootCtx = true;//are we in the root context?
-   
-   this.onEnter = function(s){
-     if (self.rootCtx){
-       self.rootCtx = false;
-       self.runCommand(s,function(er){
-         //always exit app context
-         self.rootCtx = true;
-       });
-     }else{//send to program
-       if (!self.currentProgram){
-           console.log('woops');
-           return;//something went very wrong
-       }else{
-         //console.log('wop');
-         self.currentProgram.sendEnter(s);
-       }
-     }       
-   }
-   
-   //external API for running commands
-   this.run = function(cmd,cb){
-     self.rootCtx = false;
-     self.runCommand(cmd,function(er){
-       //always exit app context
-       self.rootCtx = true;
-     });
-   }
-   
-   self.programs = {};
-   this.currentProgram = null;
-   this.delimiterProp = '$';
-   this.delimiter = function(d){
-       self.delimiterProp = d.toString();
-       return self;
-   }
-   
-   this.command = function(name,fn){//register a command
-     var p = new Program(fn);
-     self.programs[name] = p;
-     return self;
-   }
-   
-    this.runCommand = function(str,done){
-      self.rootCtx = false;//in case this was called directly
-      if (!str){
-        // todo run a _empty command
-        invalidCommand(str);
-        done(null);
-        return self;
-      }
-      //command "str" was input into the cli
-      var args = parseArgs(str.toString().split(' ')); 
-      if(args._.length < 1){
-        done(null);
-        return self;
-      }
-       
-      if ( Object.keys(self.programs).length > 0 && args._[0] ){
-        var pname = args._[0];
-        
-        if(!pname){
-          invalidCommand('<undefined>');
-          return done(null);
-        }
-        
-        if(!self.programs[pname]){
-          invalidCommand(pname);
-          return done(null);
-        }
-        
-        args._.shift();//remove first arg
-        self.currentProgram = self.programs[pname];
-        var p = self.currentProgram;
-        p.closed = false;
-        p._run(args,function(er){
-          p.closed = true;
-          done(er)
-        });
-      }else{
-        invalidCommand('<enter>');
-        return done(null);
-      }
-       
-    }
-    
-    function invalidCommand(str){
-      outStream.write('invalid command: '+str+'\n');
-    }
-    
- 
-    
-    // create a program from a function.  
-    function Program(f){
-        var program = this;
-        program._run = f;
-        
-        program.onEnter = program.onEnter || function(s){};
-        
-        program.closed = false;
-        
-        program.write = function(){
-            if (program.closed){
-                return program;
-            }
-            var len = arguments.length;
-            for (var i = 0; i < len; i ++){
-                outStream.write(arguments[i]);
-            }
-            return program;
-        }
-        
-        program.writeln = function(){
-          var len = arguments.length;
-          for (var i = 0; i < len; i ++){
-              program.write(arguments[i]);
-          }
-          program.write('\n');     
-          return program;
-        }
-        
-        program.sendEnter = function(s){
-           if (program.onEnter){
-               return program.onEnter(s);
-           }else{
-               return program;
-           }
-        }
-        program.prompt = function(s,f){
-          program.write(s);
-          program.onEnter = function(str){
-            f(str);
-          }
-        }
-    }  
-    
-      
-    return this;
-}
-
-//function stub
-function fs(){}
-},{"events":1,"minimist":10,"util":5}],8:[function(require,module,exports){
-//browser command line interface using same library
-
-//this example uses some html selectors but honestly it would be arbitrary to use console.log for output, etc
-
-module.exports = function(lineSelector,cursorSelector,termSelector){
-
-  var line = document.querySelector(lineSelector||'#term-line');
-  var cursor = document.querySelector(cursorSelector||'#term-cursor');
-  var term = document.querySelector(termSelector||'#term');
-
-  var outStream = {
-    write:function(s){
-      term.innerHTML = term.innerHTML + escapeHtml(s);//todo: handle color codes.  Later.
-    }
-  }
-
-  var inStream = {
-    //lala
-  }
-
-  var cli = require('./all-cli-simple')(inStream,outStream); 
-  
-  line.addEventListener('keydown',function(e){
-    if (e.key == 'Enter'){
-      //don't print it... I guess???
-      e.preventDefault();
-      
-      //get line
-      var str = line.value;
-      cli.onEnter(str);
-      //erase line
-      line.value = '';
-    }
-  });
-  
-  cli.delimiter = function(dstr){
-    cursor.innerHTML = escapeHtml(dstr.toString());
-  }
-  
-  cli.delimiter(cli.delimiterProp);//use default for now until overridden
-  
-  return cli;
-}
-
-/*
-  code below this was taken from moustache.js, which is really neat and MIT licensed.  Copyright info follows:
-  
-  The MIT License
-
-  Copyright (c) 2009 Chris Wanstrath (Ruby)
-  Copyright (c) 2010-2014 Jan Lehnardt (JavaScript)
-  Copyright (c) 2010-2015 The mustache.js community
-
-  Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-
-  The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-*/
-
-var entityMap = {
-  "&": "&amp;",
-  "<": "&lt;",
-  ">": "&gt;",
-  '"': '&quot;',
-  "'": '&#39;',
-  "/": '&#x2F;'
-};
-
-function escapeHtml(string) {
-  return String(string).replace(/[&<>"'\/]/g, function (s) {
-    return entityMap[s];
-  });
-}
-
-},{"./all-cli-simple":7}],9:[function(require,module,exports){
-(function (process){
-// cli-node
-
-module.exports = function(){
-
-  var outStream = {
-    write:function(s){
-      process.stdout.write(s);
-    }
-  }
-
-  var inStream = {
-    
-  }
-
-  var cli = require('./all-cli-simple')(inStream,outStream);
-
-  var s = '';
-  process.stdin.setEncoding('utf8');
-  process.stdin.on('readable',function(){
-    var chunk = process.stdin.read();
-    if(!chunk){
-      return;
-    }
-    s = s + ( chunk.toString().replace(/\r/g,'') );
-    var brIndex = s.indexOf('\n');
-    if ( brIndex > -1) {
-      var before = s.substr(0,brIndex);
-      cli.onEnter(before);
-      s = s.substring(brIndex+1);
-    }
-  });
-  process.stdin.resume;
-  
-  return cli;
-
-}
-
-}).call(this,require('_process'))
-},{"./all-cli-simple":7,"_process":3}],10:[function(require,module,exports){
+},{"./support/isBuffer":8,"_process":7,"inherits":6}],10:[function(require,module,exports){
 module.exports = function (args, opts) {
     if (!opts) opts = {};
     
@@ -1562,4 +1638,4 @@ function isNumber (x) {
 }
 
 
-},{}]},{},[6]);
+},{}]},{},[1]);

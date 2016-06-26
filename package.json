@@ -4,7 +4,8 @@
   "description": "Write simple CLI programs once for the browser and the web.",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+     "test": "browserify ./test/test.js -o ./test/browser-test.js && echo 'built ./test/browser-test.js.  Try opening ./test/index.html in a browser.'",
+    "build":"browserify ./index.js -o ./dist/browser-xplat-cli.js"
   },
   "author": "Drew Harwell",
   "license": "MIT",
@@ -14,7 +15,9 @@
   "directories": {
     "test": "test"
   },
-  "devDependencies": {},
+  "devDependencies": {
+    "browserify": "^13.0.1"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/fenwick67/xplat-cli.git"

@@ -4,7 +4,7 @@ var cli = require('../index.js');
 
 
 cli()
-.delimiter('$_H4x0R_$ ')
+.delimiter('~ ')
 .command('a',function(args,done){
     var p = this;
     setTimeout(function(){ 
