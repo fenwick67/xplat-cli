@@ -1,6 +1,6 @@
 {
   "name": "xplat-cli",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Write simple CLI programs once for the browser and the web.",
   "main": "index.js",
   "scripts": {
