@@ -1,7 +1,8 @@
 //tests
 
 var cli = require('../index.js');
-
+var chalk = require('chalk');
+chalk.enabled = true;// enable for browser.  The detection feature of Chalk makes it not work out of the box.
 
 cli()
 .delimiter('~ ')
@@ -45,8 +46,24 @@ cli()
   });
 })
 .command('help',function(args,done){// how you can use an empty entry to provide help or whatever
-  this.writeln(['available commands: ','q (i.e. questions)','a (show args)','setup','help (show this)'].join('\n   '));
+  this.writeln(['available commands: ','q (i.e. questions)','a (show args)','setup','help (show this)',"dance (it's a surprise)"].join('\n   '));
   done();
+}).command('dance',function(args,done){
+  var p = this;
+  var art = [chalk.cyan('<( 0_0<) '),chalk.green('<( 0_0 )>'),chalk.bgYellow(' (>0_0 )>'),chalk.bold.red('<( 0_0 )>')];
+  var i = 0;
+  p.write('\n');
+  p.write('<<<<<<<<<<<<<<<<<<<<<<<<<  he dance');//todo: this doesn't really work all the time
+  var iv = setInterval(function(){
+    p.write('\r' + art[i = ((i+1) %art.length)]);
+  },500);
+  
+  this.once('enter',function(){
+    p.writeln("ok... I'll stop...");
+    clearInterval(iv);
+    done();
+  });
+  
 })
 .alias('','help')// show help on empty input
 .run('setup');
