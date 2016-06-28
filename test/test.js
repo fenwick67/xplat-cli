@@ -20,18 +20,18 @@ cli()
     var quest;
     var color;
     
-    p.writeln('What... is your name?');
+    p.write('\nWhat... is your name?');
     p.once('enter',function(str){
       name = str;
-      p.writeln('What... is your quest?');
+      p.write('\nWhat... is your quest?');
       p.once('enter',function(str){
         quest = str;
-        p.writeln('What... is your favorite color?');
+        p.write('\nWhat... is your favorite color?');
         p.once('enter',function(str){
           color = str;
-          p.writeln('Looks like you are '+name+' on a quest to '+quest+' and your favorite color is '+color+'.');
+          p.write('\nLooks like you are '+name+' on a quest to '+quest+' and your favorite color is '+color+'.');
           done();
-        });   
+        });
       });
     });    
 })
@@ -66,4 +66,4 @@ cli()
   
 })
 .alias('','help')// show help on empty input
-.run('setup');
+//.run('dance');
