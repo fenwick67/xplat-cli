@@ -20,16 +20,16 @@ cli()
     var quest;
     var color;
     
-    p.write('\nWhat... is your name?');
+    p.writeln('\nWhat... is your name?');
     p.once('enter',function(str){
       name = str;
-      p.write('\nWhat... is your quest?');
+      p.writeln('\nWhat... is your quest?');
       p.once('enter',function(str){
         quest = str;
-        p.write('\nWhat... is your favorite color?');
+        p.writeln('\nWhat... is your favorite color?');
         p.once('enter',function(str){
           color = str;
-          p.write('\nLooks like you are '+name+' on a quest to '+quest+' and your favorite color is '+color+'.');
+          p.writeln('\nLooks like you are '+name+' on a quest to '+quest+' and your favorite color is '+color+'.');
           done();
         });
       });
@@ -46,7 +46,7 @@ cli()
   });
 })
 .command('help',function(args,done){// how you can use an empty entry to provide help or whatever
-  this.writeln(['available commands: ','q (i.e. questions)','a (show args)','setup','help (show this)',"dance (it's a surprise)"].join('\n   '));
+  this.writeln(['\navailable commands: ','q (i.e. questions)','a (show args)','setup','help (show this)',"dance (it's a surprise)"].join('\n   '));
   done();
 }).command('dance',function(args,done){
   var p = this;
@@ -66,4 +66,4 @@ cli()
   
 })
 .alias('','help')// show help on empty input
-//.run('dance');
+.run('dance');

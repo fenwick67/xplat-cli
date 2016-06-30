@@ -11,6 +11,8 @@
   "license": "MIT",
   "dependencies": {
     "ansi-to-html": "^0.4.1",
+    "browserify-shim": "^3.8.12",
+    "hterm": "^2.0.2",
     "keypress": "^0.2.1",
     "minimist": "^1.2.0"
   },
@@ -36,5 +38,16 @@
   "bugs": {
     "url": "https://github.com/fenwick67/xplat-cli/issues"
   },
-  "homepage": "https://github.com/fenwick67/xplat-cli#readme"
+  "homepage": "https://github.com/fenwick67/xplat-cli#readme",
+  "browserify": {
+    "transform": "browserify-shim"
+  },
+  "browserify-shim": {
+    "./hterm_all.js": "hterm",
+    "./hterm_all2.js": "lib"
+  },
+  "browser": {
+    "hterm": "./hterm_all.js",
+    "lib":"./hterm_all2.js"
+  }
 }
