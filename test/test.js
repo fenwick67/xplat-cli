@@ -5,7 +5,7 @@ var chalk = require('chalk');
 chalk.enabled = true;// enable for browser.  The detection feature of Chalk makes it not work out of the box.
 
 cli()
-.delimiter('~ ')
+.delimiter('~~~~~~~~')
 .command('a',function(args,done){
     var p = this;
     setTimeout(function(){ 
@@ -20,18 +20,18 @@ cli()
     var quest;
     var color;
     
-    p.writeln('What... is your name?');
+    p.writeln('\nWhat... is your name?');
     p.once('enter',function(str){
       name = str;
-      p.writeln('What... is your quest?');
+      p.writeln('\nWhat... is your quest?');
       p.once('enter',function(str){
         quest = str;
-        p.writeln('What... is your favorite color?');
+        p.writeln('\nWhat... is your favorite color?');
         p.once('enter',function(str){
           color = str;
-          p.writeln('Looks like you are '+name+' on a quest to '+quest+' and your favorite color is '+color+'.');
+          p.writeln('\nLooks like you are '+name+' on a quest to '+quest+' and your favorite color is '+color+'.');
           done();
-        });   
+        });
       });
     });    
 })
@@ -40,30 +40,41 @@ cli()
   p.prompt('What is your email? ',function(email){
     p.write('saving email ('+email+')...');
     setTimeout(function(){
-      p.writeln('ok!');
+      p.writeln('\nok!');
       done();
     },1000)
   });
 })
 .command('help',function(args,done){// how you can use an empty entry to provide help or whatever
-  this.writeln(['available commands: ','q (i.e. questions)','a (show args)','setup','help (show this)',"dance (it's a surprise)"].join('\n   '));
+  this.writeln(['\navailable commands: ','q (i.e. questions)','a (show args)','setup','help (show this)',"dance (it's a surprise)","direct (use direct input)"].join('\n   '));
   done();
 }).command('dance',function(args,done){
   var p = this;
   var art = [chalk.cyan('<( 0_0<) '),chalk.green('<( 0_0 )>'),chalk.bgYellow(' (>0_0 )>'),chalk.bold.red('<( 0_0 )>')];
   var i = 0;
   p.write('\n');
-  p.write('<<<<<<<<<<<<<<<<<<<<<<<<<  he dance');//todo: this doesn't really work all the time
+  p.write('<<<<<<<<<<<<<<<<<<<<<<<<<  he dance');
   var iv = setInterval(function(){
     p.write('\r' + art[i = ((i+1) %art.length)]);
   },500);
   
   this.once('enter',function(){
-    p.writeln("ok... I'll stop...");
+    p.writeln("ok... I'll stop...                    \n");
     clearInterval(iv);
     done();
   });
   
+}).command('direct',function(args,done){
+  var p = this;
+  p.write('When you press c, this will exit, without hitting enter');
+  
+  this.on('data',function(s){
+    if (s.indexOf('c') == 0){
+      p.write('\n');
+      done();
+    }
+  });
+  
 })
 .alias('','help')// show help on empty input
-.run('setup');
+.run('dance');
