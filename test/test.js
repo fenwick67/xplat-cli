@@ -5,7 +5,7 @@ var chalk = require('chalk');
 chalk.enabled = true;// enable for browser.  The detection feature of Chalk makes it not work out of the box.
 
 cli()
-.delimiter('~ ')
+.delimiter('~~~~~~~~')
 .command('a',function(args,done){
     var p = this;
     setTimeout(function(){ 
@@ -40,7 +40,7 @@ cli()
   p.prompt('What is your email? ',function(email){
     p.write('saving email ('+email+')...');
     setTimeout(function(){
-      p.writeln('ok!');
+      p.writeln('\nok!');
       done();
     },1000)
   });
@@ -59,7 +59,7 @@ cli()
   },500);
   
   this.once('enter',function(){
-    p.writeln("ok... I'll stop...");
+    p.writeln("ok... I'll stop...                    \n");
     clearInterval(iv);
     done();
   });

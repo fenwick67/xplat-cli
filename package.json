@@ -10,10 +10,12 @@
   "author": "Drew Harwell",
   "license": "MIT",
   "dependencies": {
+    "ansi-escapes": "^1.4.0",
     "ansi-to-html": "^0.4.1",
     "browserify-shim": "^3.8.12",
     "hterm": "^2.0.2",
     "keypress": "^0.2.1",
+    "lodash": "^4.13.1",
     "minimist": "^1.2.0"
   },
   "directories": {
@@ -48,6 +50,6 @@
   },
   "browser": {
     "hterm": "./hterm_all.js",
-    "lib":"./hterm_all2.js"
+    "lib": "./hterm_all2.js"
   }
 }
