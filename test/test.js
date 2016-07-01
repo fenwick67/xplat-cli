@@ -46,14 +46,14 @@ cli()
   });
 })
 .command('help',function(args,done){// how you can use an empty entry to provide help or whatever
-  this.writeln(['\navailable commands: ','q (i.e. questions)','a (show args)','setup','help (show this)',"dance (it's a surprise)"].join('\n   '));
+  this.writeln(['\navailable commands: ','q (i.e. questions)','a (show args)','setup','help (show this)',"dance (it's a surprise)","direct (use direct input)"].join('\n   '));
   done();
 }).command('dance',function(args,done){
   var p = this;
   var art = [chalk.cyan('<( 0_0<) '),chalk.green('<( 0_0 )>'),chalk.bgYellow(' (>0_0 )>'),chalk.bold.red('<( 0_0 )>')];
   var i = 0;
   p.write('\n');
-  p.write('<<<<<<<<<<<<<<<<<<<<<<<<<  he dance');//todo: this doesn't really work all the time
+  p.write('<<<<<<<<<<<<<<<<<<<<<<<<<  he dance');
   var iv = setInterval(function(){
     p.write('\r' + art[i = ((i+1) %art.length)]);
   },500);
@@ -62,6 +62,17 @@ cli()
     p.writeln("ok... I'll stop...                    \n");
     clearInterval(iv);
     done();
+  });
+  
+}).command('direct',function(args,done){
+  var p = this;
+  p.write('When you press c, this will exit, without hitting enter');
+  
+  this.on('data',function(s){
+    if (s.indexOf('c') == 0){
+      p.write('\n');
+      done();
+    }
   });
   
 })
